@@ -4,7 +4,45 @@ A TypeScript MCP server for the BMW catalog at https://www.realoem.com/bmw/enUS/
 
 VIN lookup alone does not resolve every part alternative. The E88 catalog lists both manual and automatic drive shafts. This server preserves those alternatives and the conditions an agent must check before recommending a purchase.
 
-## Setup
+## Deploy to Cloudflare Workers
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hcampbell98/RealOEMMCP)
+
+The button creates a copy of this public repository in your GitHub account and deploys it to your Cloudflare account. Cloudflare provisions the `CATALOG` Durable Object and configures automatic deployments from your new repository.
+
+During setup, supply `MCP_AUTH_TOKEN`, a random token you generate with `openssl rand -hex 32`. Keep it private and use the same token in your MCP client's authorization header. The endpoint refuses MCP requests when this secret is missing.
+
+After deployment, connect a client that supports Streamable HTTP and bearer headers:
+
+```json
+{
+  "mcpServers": {
+    "realoem": {
+      "url": "https://<your-worker>.<your-subdomain>.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}
+```
+
+Client configuration formats vary. Supply the `/mcp` URL and bearer header using your client's supported settings. This deployment uses a static token, not an OAuth login flow. Cross-origin browser requests are rejected; native MCP clients can connect without an `Origin` header.
+
+The Worker uses direct HTTP on the default RealOEM host. Its Durable Object serializes catalog requests across clients, persists the last request time, and keeps a bounded in-memory page cache. Cached pages may be discarded when the object restarts. Each deployment has its own coordinator; separate deployments do not share request limits or cached data. Worker requests are stateless, so no MCP session or vehicle state is stored between calls. Pass `vehicleId` on each catalog request.
+
+To deploy manually:
+
+```bash
+npm ci
+npx wrangler login
+npx wrangler secret put MCP_AUTH_TOKEN
+npm run deploy
+```
+
+Cloudflare resource usage is charged to the account hosting the deployment according to its plan. RealOEM access from a Worker was verified, but upstream availability and access policies can change.
+
+## Run locally
 
 Requires Node.js 22 or later.
 
@@ -26,7 +64,7 @@ Add this to an MCP client's configuration, adjusting the absolute path:
 }
 ```
 
-The server uses stdio and defaults to HTTP on `https://new-ui.realoem.com/bmw/enUS/`, requesting the classic layout with `ui=v1`. No browser installation or environment overrides are needed for this configuration. Diagnostics and protocol errors do not write ordinary text to stdout. It serialises requests, spaces them by at least one second, caches up to 100 successful pages for 15 minutes, and retries HTTP 429/502/503/504 at most twice. The cache belongs to the running process.
+The local server uses stdio and defaults to HTTP on `https://new-ui.realoem.com/bmw/enUS/`, requesting the classic layout with `ui=v1`. No browser installation, authentication token or environment overrides are needed for this configuration. Diagnostics and protocol errors do not write ordinary text to stdout. Both deployments serialize catalog requests, space them by at least one second, cache up to 100 successful pages for 15 minutes within a 16 MB HTML memory budget, and retry HTTP 429/502/503/504 at most twice. Responses are limited to 2 MB of HTML. The request queue holds at most 20 requests and rejects requests that have waited longer than 30 seconds. The local cache belongs to the running process.
 
 ## Tools
 
@@ -55,7 +93,7 @@ Do not combine alternatives or repeated part numbers into a purchase list. Quant
 
 The `www.realoem.com` host returned Cloudflare HTTP 403 challenges for live VIN queries in this environment. The official `new-ui.realoem.com` host was accessible: live VIN identification, rear-axle browsing, bearing diagrams and replacement searches were verified through the MCP for VM52466. That host and HTTP transport are now the defaults. The server requests the classic layout with `ui=v1` on live requests. It reports access errors with configuration guidance instead of presenting empty results or guessing fitment. MCP initialization instructions also explain the defaults to agents without this conversation's context.
 
-These optional environment variables override the defaults. For browser mode, first run `npm run browser:install` or supply an existing browser executable:
+These optional environment variables override the local server's defaults. Browser transport is available only locally. For browser mode, first run `npm run browser:install` or supply an existing browser executable:
 
 - `REALOEM_HEADLESS=false`: open a visible Chromium window on a machine with a desktop. A challenged page waits up to 60 seconds for you to complete normal site interaction. Configure the MCP client for a timeout above 90 seconds if using this mode.
 - `REALOEM_BROWSER_EXECUTABLE`: use an existing Chromium or Chrome executable instead of Playwright's installed browser.
@@ -76,10 +114,16 @@ Open RealOEM normally in that browser, then set `REALOEM_TRANSPORT=browser` and 
 ```bash
 npm run build
 npm test
+npm run worker:check
+npm run test:worker
 ```
 
 Run `npm run format` to format TypeScript and JSON files, or `npm run format:check` to check their formatting.
 
 Sanitized HTML fixtures support offline tests for VIN attributes, navigation, conditional alternatives, companion rows, reference quantities, replacement notes, challenge detection, caching and MCP tool calls.
 
-Manual vehicle browsing follows the captured HTML form and JavaScript, but a live manual browsing sequence remains unverified. Cross-model applicability and VIN equipment decoding are not implemented.
+Worker integration tests run the deployed bundle in Miniflare with fixture-backed upstream responses. They check remote MCP discovery and tool calls, bearer authentication, Origin checks, caching shared between clients, and request pacing across concurrent calls. They make no live RealOEM requests.
+
+For local Worker development, copy `.dev.vars.example` to `.dev.vars`, set a random `MCP_AUTH_TOKEN`, and run `npm run worker:dev`. Connect to `http://localhost:8787/mcp` using that token. `npm run worker:build` validates the Worker bundle without deploying; `npm run worker:types` regenerates binding types after configuration changes.
+
+All six tools were verified against live RealOEM pages through a deployed Worker on 2026-10-11, including manual selection of the January 2011 E88 118d and rear bearing `33416762317`. Local stdio discovery and live VIN lookup were also verified. Cross-model applicability and VIN equipment decoding are not implemented.

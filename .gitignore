@@ -17,6 +17,7 @@ docs/
 # Cloudflare generated files and local state
 .wrangler/
 .cloudflare/
+src/worker-env.d.ts
 
 # Test output and logs
 coverage/

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../src/server.js';
-import { LiveTransport } from '../src/transport.js';
+import { HttpTransport } from '../src/transport.js';
 test('MCP discovery, vehicle workflow, validation and tool errors', async () => {
   const server = createServer({
     async get(endpoint, params) {
@@ -109,7 +109,7 @@ test('default transport uses verified HTTP host, caches pages and explains acces
     assert.equal(url.searchParams.get('ui'), 'v1');
     return new Response('<div id="main">Catalog</div>', { status: 200 });
   };
-  const t = new LiveTransport();
+  const t = new HttpTransport();
   try {
     await t.get('select', { vin: 'VM52466' });
     await t.get('select', { vin: 'VM52466' });
@@ -120,7 +120,7 @@ test('default transport uses verified HTTP host, caches pages and explains acces
       /HTTP 403 from https:\/\/new-ui\.realoem\.com using http.*REALOEM_TRANSPORT=browser/,
     );
     process.env.REALOEM_BASE_URL = 'https://www.realoem.com/bmw/enUS/';
-    const overridden = new LiveTransport();
+    const overridden = new HttpTransport({ baseUrl: process.env.REALOEM_BASE_URL });
     try {
       await assert.rejects(
         overridden.get('select', { vin: 'AB12345' }),

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "realoem-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "secrets": { "required": ["MCP_AUTH_TOKEN"] },
+  "durable_objects": {
+    "bindings": [{ "name": "CATALOG", "class_name": "CatalogCoordinator" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CatalogCoordinator"] }],
+}

@@ -13,8 +13,14 @@
     "dev": "tsx src/index.ts",
     "test": "tsx --test test/*.test.ts",
     "browser:install": "playwright install chromium",
-    "format": "prettier --write \"{src,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json",
-    "format:check": "prettier --check \"{src,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json"
+    "format": "prettier --write \"{src,test}/**/*.ts\" package.json tsconfig*.json wrangler.jsonc .prettierrc.json",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\" package.json tsconfig*.json wrangler.jsonc .prettierrc.json",
+    "worker:types": "wrangler types src/worker-env.d.ts --include-runtime false",
+    "worker:check": "npm run worker:types && tsc -p tsconfig.worker.json",
+    "worker:dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "worker:build": "wrangler deploy --dry-run --outdir .wrangler/build",
+    "test:worker": "npm run worker:build && tsx --test test/worker/*.test.ts"
   },
   "engines": {
     "node": ">=22"
@@ -26,9 +32,22 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261011.1",
     "@types/node": "^24.0.0",
+    "miniflare": "^5.20261006.1-alpha",
     "prettier": "^3.9.10",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "wrangler": "^4.149.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "MCP_AUTH_TOKEN": {
+        "description": "Generate a random token with `openssl rand -hex 32`. Supply it as `Authorization: Bearer <token>` when connecting to your deployed MCP."
+      },
+      "CATALOG": {
+        "description": "Coordinates RealOEM requests and caches catalog pages for this deployment."
+      }
+    }
   }
 }
