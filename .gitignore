@@ -1,0 +1,28 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Local research and browser captures
+docs/
+*.har
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Cloudflare generated files and local state
+.wrangler/
+.cloudflare/
+
+# Test output and logs
+coverage/
+*.tsbuildinfo
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
