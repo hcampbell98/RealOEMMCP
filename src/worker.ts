@@ -44,6 +44,10 @@ export class CatalogCoordinator extends DurableObject<Env> {
     return true;
   }
 
+  async getImage(url: string) {
+    return this.catalog.getImage(url);
+  }
+
   async get(endpoint: string, params: Record<string, string | undefined>) {
     return this.catalog.get(endpoint, params);
   }

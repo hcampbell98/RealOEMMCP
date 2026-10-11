@@ -219,6 +219,7 @@ export function createOAuthProvider(origin: string) {
         const coordinator = env.CATALOG.getByName('realoem');
         const catalog: Transport = {
           get: (endpoint, params) => coordinator.get(endpoint, params),
+          getImage: (url) => coordinator.getImage(url),
           async close() {},
         };
         return handleMcpRequest(request, catalog);

@@ -24,7 +24,7 @@ export function createServer(transport: Transport) {
     { name: 'realoem-mcp', version: '0.1.0' },
     {
       instructions:
-        'Live access defaults to HTTP on https://new-ui.realoem.com/bmw/enUS/ with the classic layout ui=v1. This configuration was verified with live catalog requests; www.realoem.com returned access challenges in the same environment. Local environment overrides can change the transport and host. Workers uses the default HTTP host. Follow configuration guidance in access errors; do not infer catalog results from blocked requests. Identify the vehicle first. Use the returned vehicleId for every subsequent call. Read diagram rows in order, including option conditions, production limits, conjunctions, reference rows and ENDED notes. VIN does not prove equipment. Ask for missing transmission/option details; never claim exact fitment based solely on search matches. Quantity X is a reference. A diagram is not a complete repair procedure or purchase list. Cite sourceUrl.',
+        'Live access defaults to HTTP on https://new-ui.realoem.com/bmw/enUS/ with the classic layout ui=v1. This configuration was verified with live catalog requests; www.realoem.com returned access challenges in the same environment. Local environment overrides can change the transport and host. Workers uses the default HTTP host. Follow configuration guidance in access errors; do not infer catalog results from blocked requests. Use get_diagram_image to view an exploded diagram and get_diagram_parts to read its ordered conditions. Identify the vehicle first. Use the returned vehicleId for every subsequent call. Read diagram rows in order, including option conditions, production limits, conjunctions, reference rows and ENDED notes. VIN does not prove equipment. Ask for missing transmission/option details; never claim exact fitment based solely on search matches. Quantity X is a reference. A diagram is not a complete repair procedure or purchase list. Cite sourceUrl.',
     },
   );
   async function result<T extends object>(page: Promise<PageResult>, parse: (html: string) => T) {
@@ -131,6 +131,46 @@ export function createServer(transport: Transport) {
         diagramId,
         ...parseDiagram(html),
       })),
+  );
+  server.registerTool(
+    'get_diagram_image',
+    {
+      description:
+        'Retrieve the exploded diagram itself as an inline MCP image. Resolve the image from the vehicle diagram page; use get_diagram_parts for position numbers, part rows and fitment conditions.',
+      inputSchema: { vehicleId, diagramId },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ vehicleId, diagramId }) => {
+      try {
+        const page = await transport.get('showparts', { id: vehicleId, diagId: diagramId });
+        const diagram = parseDiagram(page.html);
+        if (!diagram.imageUrl) throw new Error('This RealOEM diagram has no image');
+        const { data, mimeType, ...image } = await transport.getImage(diagram.imageUrl);
+        const metadata = {
+          vehicleId,
+          diagramId,
+          title: diagram.title,
+          imageUrl: image.sourceUrl,
+          sourceUrl: page.sourceUrl,
+          retrievedAt: image.retrievedAt,
+          source: image.source,
+        };
+        return {
+          content: [
+            { type: 'image' as const, data, mimeType },
+            { type: 'text' as const, text: JSON.stringify(metadata) },
+          ],
+          structuredContent: metadata,
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            { type: 'text' as const, text: error instanceof Error ? error.message : String(error) },
+          ],
+        };
+      }
+    },
   );
   server.registerTool(
     'search_parts',

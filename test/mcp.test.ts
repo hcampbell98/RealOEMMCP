@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../src/server.js';
+import { imageData } from './image-fixture.js';
 import { HttpTransport } from '../src/transport.js';
 test('MCP discovery, vehicle workflow, validation and tool errors', async () => {
   const server = createServer({
@@ -20,6 +21,16 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
         retrievedAt: '2026-10-11',
       };
     },
+    async getImage(url) {
+      assert.equal(url, 'https://www.realoem.com/bmw/images/diag_aaph.jpg');
+      return {
+        data: imageData,
+        mimeType: 'image/png',
+        sourceUrl: url.replace('www.', 'new-ui.'),
+        retrievedAt: '2026-10-11',
+        source: 'live',
+      };
+    },
     async close() {},
   });
   const client = new Client({ name: 'test', version: '1.0' });
@@ -32,7 +43,7 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
       /Live access defaults to HTTP on https:\/\/new-ui\.realoem\.com/,
     );
     const list = await client.listTools();
-    assert.equal(list.tools.length, 6);
+    assert.equal(list.tools.length, 7);
     const vehicle = await client.callTool({
       name: 'identify_vehicle',
       arguments: { vin: 'VM52466' },
@@ -50,6 +61,14 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
     });
     assert.equal((parts.structuredContent as any).parts.length, 2);
     assert.equal((parts.structuredContent as any).source, 'live');
+    const image = await client.callTool({
+      name: 'get_diagram_image',
+      arguments: { vehicleId: id, diagramId: '33_1231' },
+    });
+    assert.ok(!image.isError);
+    assert.deepEqual(image.content[0], { type: 'image', data: imageData, mimeType: 'image/png' });
+    assert.equal(image.structuredContent?.diagramId, '33_1231');
+    assert.ok((image.content[1] as { text: string }).text.includes('sourceUrl'));
     const invalid = await client.callTool({
       name: 'identify_vehicle',
       arguments: { vin: 'bad vin' },
@@ -77,6 +96,9 @@ test('MCP accepts and normalises part numbers containing letters and preserves r
         sourceUrl: 'https://new-ui.realoem.com/bmw/enUS/partsearch',
         retrievedAt: '2026-10-11',
       };
+    },
+    async getImage() {
+      throw new Error('Image not configured in this fixture');
     },
     async close() {},
   });

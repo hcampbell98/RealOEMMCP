@@ -62,6 +62,7 @@ The local server uses stdio and defaults to HTTP on `https://new-ui.realoem.com/
 - `list_part_groups(vehicleId)`: retrieve major groups.
 - `list_diagrams(vehicleId, groupId, query?)`: retrieve a group's diagrams; `query` filters their titles without more requests.
 - `get_diagram_parts(vehicleId, diagramId)`: retrieve the image URL, part rows and ordered condition rows.
+- `get_diagram_image(vehicleId, diagramId)`: download the exploded diagram and return it as an inline MCP image, with its source URL and retrieval time. Uses the original image bytes and MIME type.
 - `search_parts(vehicleId, query, diagramId?)`: search an 11-character BMW part number, including numbers containing letters, with optional spaces; retrieve matching diagrams and available supersession notes.
 
 Use the returned `vehicleId` on every catalog call. Results include `sourceUrl`, `retrievedAt` and `source: "live"`.
@@ -72,11 +73,15 @@ An example request to an agent:
 
 For this example, identification returns `UM92-EUR-01-2011-E88-BMW-118d`, January 2011, N47, right hand drive. Diagram `26_0216` contains manual shaft `26107567953` and automatic shaft `26117526136`, with `S205A=Yes` before the automatic row.
 
+The image tool follows the [MCP image content specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#image-content): it returns a content block with `type: "image"`, base64 `data`, and `mimeType`, plus text and structured source metadata. Clients decide how to display or pass image blocks to their model.
+
+Image downloads use HTTP on the configured RealOEM host in both local transport modes. Only catalog diagram paths on the official hosts are accepted. Redirects, non-image responses, MIME/signature mismatches, and images larger than 2 MB are rejected. Image requests share the catalog queue and one-second request pacing. Successful images are cached for 15 minutes, up to 20 entries within an additional 8 MB memory budget. Workers shares this cache across clients through the same Durable Object.
+
 ## Fitment and repair scope
 
 `get_diagram_parts` returns `fitmentStatus: "requires_confirmation"`. Its `rows` preserve table order, `positionGroup`, indentation `depth`, and note cells. `parts` is a convenience list of the catalog part rows, including reference rows. Interpret it together with `rows`.
 
-Do not combine alternatives or repeated part numbers into a purchase list. Quantity `X` identifies a reference in catalog diagrams. Position `--` can mark a required companion or a compatibility reference. Read "only in conjunction with", "only applies to", option conditions, dates and `ENDED` notes before choosing parts. A diagram does not establish a complete repair procedure or every item needed for a job. Image URLs are returned as links; the server does not download images.
+Do not combine alternatives or repeated part numbers into a purchase list. Quantity `X` identifies a reference in catalog diagrams. Position `--` can mark a required companion or a compatibility reference. Read "only in conjunction with", "only applies to", option conditions, dates and `ENDED` notes before choosing parts. A diagram does not establish a complete repair procedure or every item needed for a job. `get_diagram_parts` returns image URLs as links. Call `get_diagram_image` to view the image itself alongside the part rows. Images do not establish fitment by themselves.
 
 ## Live access
 
@@ -111,8 +116,8 @@ Run `npm run format` to format TypeScript and JSON files, or `npm run format:che
 
 Sanitized HTML fixtures support offline tests for VIN attributes, navigation, conditional alternatives, companion rows, reference quantities, replacement notes, challenge detection, caching and MCP tool calls.
 
-Worker integration tests run the deployed bundle in Miniflare with fixture-backed upstream responses. They check remote MCP discovery and tool calls, OAuth discovery, consent, browser binding, PKCE, authorization-code replay, resource audiences, refresh, revocation, scope enforcement, login throttling, Origin checks, caching shared between clients, and request pacing across concurrent calls. They make no live RealOEM requests.
+Worker integration tests run the deployed bundle in Miniflare with fixture-backed upstream responses. They check remote MCP discovery and tool calls, OAuth discovery, consent, browser binding, PKCE, authorization-code replay, resource audiences, refresh, revocation, scope enforcement, login throttling, Origin checks, inline image content, shared page and image caching, and request pacing across concurrent calls. They make no live RealOEM requests.
 
 For local Worker development, copy `.dev.vars.example` to `.dev.vars`, set a random `MCP_AUTH_TOKEN`, and run `npm run worker:dev`. Connect an OAuth-capable client to `http://localhost:8787/mcp` and enter the token on the local login page. `npm run worker:build` validates the Worker bundle without deploying; `npm run worker:types` regenerates binding types after configuration changes.
 
-All six tools were verified against live RealOEM pages through a deployed Worker on 2026-10-11, including manual selection of the January 2011 E88 118d and rear bearing `33416762317`. Local stdio discovery and live VIN lookup were also verified. Cross-model applicability and VIN equipment decoding are not implemented.
+All seven tools were verified against live RealOEM pages through a deployed Worker on 2026-10-11, including manual selection of the January 2011 E88 118d and rear bearing `33416762317` and the JPEG returned by `get_diagram_image` for diagram `33_1231`. Local stdio discovery and live VIN lookup were also verified. Cross-model applicability and VIN equipment decoding are not implemented.

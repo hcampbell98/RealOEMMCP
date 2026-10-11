@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { imageData, imageBytes } from '../image-fixture.js';
 import { OAuthTestClient } from './oauth-client.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -23,6 +24,9 @@ test('Worker serves authenticated MCP and coordinates concurrent catalog request
             starts.push(Date.now());
             const url = new URL(request.url);
             assert.equal(url.origin, 'https://new-ui.realoem.com');
+            if (url.pathname === '/bmw/images/diag_aaph.jpg') {
+              return new Response(imageBytes, { headers: { 'Content-Type': 'image/png' } });
+            }
             assert.equal(url.searchParams.get('ui'), 'v1');
             assert.equal(request.headers.get('User-Agent'), 'RealOEMMCP/0.1');
             const endpoint = url.pathname.split('/').pop();
@@ -73,7 +77,7 @@ test('Worker serves authenticated MCP and coordinates concurrent catalog request
         },
       });
       await client.connect(transport);
-      assert.equal((await client.listTools()).tools.length, 6);
+      assert.equal((await client.listTools()).tools.length, 7);
     }
 
     const vehicleId = 'UM92-EUR-01-2011-E88-BMW-118d';
@@ -99,6 +103,24 @@ test('Worker serves authenticated MCP and coordinates concurrent catalog request
     });
     assert.ok(!cached.isError);
     assert.equal(starts.length, 2, 'Catalog cache must be shared between MCP clients');
+    const image = await clients[0].callTool({
+      name: 'get_diagram_image',
+      arguments: { vehicleId, diagramId: '33_1231' },
+    });
+    assert.ok(!image.isError);
+    assert.deepEqual(image.content[0], { type: 'image', data: imageData, mimeType: 'image/png' });
+    assert.equal(
+      image.structuredContent?.imageUrl,
+      'https://new-ui.realoem.com/bmw/images/diag_aaph.jpg',
+    );
+    assert.equal(starts.length, 3);
+    assert.ok(starts[2] - starts[1] >= 900, 'Images must share catalog request pacing');
+    const cachedImage = await clients[1].callTool({
+      name: 'get_diagram_image',
+      arguments: { vehicleId, diagramId: '33_1231' },
+    });
+    assert.ok(!cachedImage.isError);
+    assert.equal(starts.length, 3, 'Image cache must be shared between MCP clients');
   } finally {
     for (const client of clients) await client.close();
     await worker.dispose();
