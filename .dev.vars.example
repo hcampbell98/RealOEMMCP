@@ -1,2 +1,2 @@
-# Replace this with a random token. Use the same token in your MCP client's bearer header.
+# Replace this with a random token. Enter it on your Worker's OAuth login page.
 MCP_AUTH_TOKEN=

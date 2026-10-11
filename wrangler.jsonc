@@ -3,9 +3,10 @@
   "name": "realoem-mcp",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-11",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
   "secrets": { "required": ["MCP_AUTH_TOKEN"] },
+  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
   "durable_objects": {
     "bindings": [{ "name": "CATALOG", "class_name": "CatalogCoordinator" }],
   },

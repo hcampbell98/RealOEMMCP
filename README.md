@@ -8,26 +8,15 @@ VIN lookup alone does not resolve every part alternative. The E88 catalog lists 
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hcampbell98/RealOEMMCP)
 
-The button creates a copy of this public repository in your GitHub account and deploys it to your Cloudflare account. Cloudflare provisions the `CATALOG` Durable Object and configures automatic deployments from your new repository.
+The button creates a copy of this public repository in your GitHub account and deploys it to your Cloudflare account. Cloudflare provisions the `CATALOG` Durable Object and `OAUTH_KV` namespace, then configures automatic deployments from your new repository. No external identity provider or OAuth application registration is needed.
 
-During setup, supply `MCP_AUTH_TOKEN`, a random token you generate with `openssl rand -hex 32`. Keep it private and use the same token in your MCP client's authorization header. The endpoint refuses MCP requests when this secret is missing.
+During setup, supply `MCP_AUTH_TOKEN`, a random token you generate with `openssl rand -hex 32`. Keep it private. This is the password for your deployment's OAuth login page. The Worker refuses requests when the secret is missing.
 
-After deployment, connect a client that supports Streamable HTTP and bearer headers:
+After deployment, add `https://<your-worker>.<your-subdomain>.workers.dev/mcp` to an MCP client that supports Streamable HTTP and OAuth. For ChatGPT, create a custom connector or app with that URL and choose OAuth. Leave OAuth client ID and client secret blank so the client can discover and register itself. When the Worker login page opens, check the client and return destination, paste your deployment token, and select **Allow access**.
 
-```json
-{
-  "mcpServers": {
-    "realoem": {
-      "url": "https://<your-worker>.<your-subdomain>.workers.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer <your-token>"
-      }
-    }
-  }
-}
-```
+The token goes only to your Worker over HTTPS. The client receives separate OAuth access and refresh tokens. Access tokens last one hour; refresh credentials last 30 days. The server supports OAuth discovery, dynamic client registration, client ID metadata documents, S256 PKCE, resource-bound tokens, and revocation. Static `Authorization: Bearer <MCP_AUTH_TOKEN>` headers are no longer accepted. Cross-origin browser requests to `/mcp` are rejected; native MCP clients can connect without an `Origin` header.
 
-Client configuration formats vary. Supply the `/mcp` URL and bearer header using your client's supported settings. This deployment uses a static token, not an OAuth login flow. Cross-origin browser requests are rejected; native MCP clients can connect without an `Origin` header.
+This is a single-owner deployment. Anyone with the deployment token can approve clients with the same catalog permissions. Changing `MCP_AUTH_TOKEN` invalidates existing OAuth credentials on their next use or refresh, so each client must reconnect. Revocation and token state use Workers KV and can take time to propagate across Cloudflare locations.
 
 The Worker uses direct HTTP on the default RealOEM host. Its Durable Object serializes catalog requests across clients, persists the last request time, and keeps a bounded in-memory page cache. Cached pages may be discarded when the object restarts. Each deployment has its own coordinator; separate deployments do not share request limits or cached data. Worker requests are stateless, so no MCP session or vehicle state is stored between calls. Pass `vehicleId` on each catalog request.
 
@@ -122,8 +111,8 @@ Run `npm run format` to format TypeScript and JSON files, or `npm run format:che
 
 Sanitized HTML fixtures support offline tests for VIN attributes, navigation, conditional alternatives, companion rows, reference quantities, replacement notes, challenge detection, caching and MCP tool calls.
 
-Worker integration tests run the deployed bundle in Miniflare with fixture-backed upstream responses. They check remote MCP discovery and tool calls, bearer authentication, Origin checks, caching shared between clients, and request pacing across concurrent calls. They make no live RealOEM requests.
+Worker integration tests run the deployed bundle in Miniflare with fixture-backed upstream responses. They check remote MCP discovery and tool calls, OAuth discovery, consent, browser binding, PKCE, authorization-code replay, resource audiences, refresh, revocation, scope enforcement, login throttling, Origin checks, caching shared between clients, and request pacing across concurrent calls. They make no live RealOEM requests.
 
-For local Worker development, copy `.dev.vars.example` to `.dev.vars`, set a random `MCP_AUTH_TOKEN`, and run `npm run worker:dev`. Connect to `http://localhost:8787/mcp` using that token. `npm run worker:build` validates the Worker bundle without deploying; `npm run worker:types` regenerates binding types after configuration changes.
+For local Worker development, copy `.dev.vars.example` to `.dev.vars`, set a random `MCP_AUTH_TOKEN`, and run `npm run worker:dev`. Connect an OAuth-capable client to `http://localhost:8787/mcp` and enter the token on the local login page. `npm run worker:build` validates the Worker bundle without deploying; `npm run worker:types` regenerates binding types after configuration changes.
 
 All six tools were verified against live RealOEM pages through a deployed Worker on 2026-10-11, including manual selection of the January 2011 E88 118d and rear bearing `33416762317`. Local stdio discovery and live VIN lookup were also verified. Cross-model applicability and VIN equipment decoding are not implemented.

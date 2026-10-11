@@ -26,6 +26,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.3",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "cheerio": "^1.1.2",
     "playwright": "^1.56.0",
@@ -43,10 +44,13 @@
   "cloudflare": {
     "bindings": {
       "MCP_AUTH_TOKEN": {
-        "description": "Generate a random token with `openssl rand -hex 32`. Supply it as `Authorization: Bearer <token>` when connecting to your deployed MCP."
+        "description": "Generate a random token with `openssl rand -hex 32`. Enter it on this Worker's OAuth login page when connecting your MCP client."
       },
       "CATALOG": {
         "description": "Coordinates RealOEM requests and caches catalog pages for this deployment."
+      },
+      "OAUTH_KV": {
+        "description": "Stores OAuth clients, consent transactions, and hashed access and refresh credentials. Provisioned automatically during deployment."
       }
     }
   }

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { OAuthTestClient } from './oauth-client.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -14,8 +15,9 @@ test('Worker serves authenticated MCP and coordinates concurrent catalog request
           modules: true,
           scriptPath: '.wrangler/build/worker.js',
           compatibilityDate: '2026-10-11',
-          compatibilityFlags: ['nodejs_compat'],
+          compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
           bindings: { MCP_AUTH_TOKEN: 'integration-test-token' },
+          kvNamespaces: ['OAUTH_KV'],
           durableObjects: { CATALOG: { className: 'CatalogCoordinator', useSQLite: true } },
           async outboundService(request) {
             starts.push(Date.now());
@@ -47,11 +49,21 @@ test('Worker serves authenticated MCP and coordinates concurrent catalog request
     assert.equal(starts.length, 0);
     assert.equal((await worker.dispatchFetch('https://mcp.example/missing')).status, 404);
 
+    const oauth = new OAuthTestClient(
+      async (url, init) => {
+        const response = await worker.dispatchFetch(url, init);
+        return new Response(response.body, { status: response.status, headers: response.headers });
+      },
+      'https://mcp.example',
+      'integration-test-token',
+    );
+    const tokens = await oauth.authorize();
+
     for (let index = 0; index < 2; index++) {
       const client = new Client({ name: 'worker-test', version: '1.0' });
       clients.push(client);
       const transport = new StreamableHTTPClientTransport(new URL('https://mcp.example/mcp'), {
-        requestInit: { headers: { Authorization: 'Bearer integration-test-token' } },
+        requestInit: { headers: { Authorization: `Bearer ${tokens.access_token}` } },
         fetch: async (input, init) => {
           const response = await worker.dispatchFetch(String(input), init);
           return new Response(response.body, {
@@ -101,7 +113,8 @@ test('Worker fails closed when its authentication secret is missing', async () =
           modules: true,
           scriptPath: '.wrangler/build/worker.js',
           compatibilityDate: '2026-10-11',
-          compatibilityFlags: ['nodejs_compat'],
+          compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
+          kvNamespaces: ['OAUTH_KV'],
           durableObjects: { CATALOG: { className: 'CatalogCoordinator', useSQLite: true } },
         },
       ],
