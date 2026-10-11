@@ -13,8 +13,8 @@
     "dev": "tsx src/index.ts",
     "test": "tsx --test test/*.test.ts",
     "browser:install": "playwright install chromium",
-    "format": "prettier --write \"{src,scripts,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json",
-    "format:check": "prettier --check \"{src,scripts,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json"
+    "format": "prettier --write \"{src,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\" package.json tsconfig.json .prettierrc.json"
   },
   "engines": {
     "node": ">=22"

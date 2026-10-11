@@ -1,17 +1,13 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { DEFAULT_TRANSPORT, harTransport, LiveTransport } from './transport.js';
+import { DEFAULT_TRANSPORT, LiveTransport } from './transport.js';
 import { createServer } from './server.js';
 
 const mode = process.env.REALOEM_TRANSPORT || DEFAULT_TRANSPORT;
-if (!['browser', 'http', 'har'].includes(mode))
-  throw new Error('REALOEM_TRANSPORT must be browser, http or har');
-if (mode === 'har' && !process.env.REALOEM_HAR_PATH)
-  throw new Error('HAR mode requires REALOEM_HAR_PATH');
-const transport =
-  mode === 'har'
-    ? await harTransport(process.env.REALOEM_HAR_PATH!)
-    : new LiveTransport(mode as 'browser' | 'http');
+if (mode !== 'browser' && mode !== 'http') {
+  throw new Error('REALOEM_TRANSPORT must be browser or http');
+}
+const transport = new LiveTransport(mode);
 const server = createServer(transport);
 let stopping = false;
 async function close() {

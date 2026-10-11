@@ -2,7 +2,7 @@
 
 A TypeScript MCP server for the BMW catalog at https://www.realoem.com/bmw/enUS/. It resolves a VIN to a catalog vehicle, browses groups and diagrams, and returns part numbers, quantities, production limits, option notes, companion rows and replacement history.
 
-VIN lookup alone does not resolve every part alternative. The captured E88 catalog lists both manual and automatic drive shafts. This server preserves those alternatives and the conditions an agent must check before recommending a purchase.
+VIN lookup alone does not resolve every part alternative. The E88 catalog lists both manual and automatic drive shafts. This server preserves those alternatives and the conditions an agent must check before recommending a purchase.
 
 ## Setup
 
@@ -37,19 +37,19 @@ The server uses stdio and defaults to HTTP on `https://new-ui.realoem.com/bmw/en
 - `get_diagram_parts(vehicleId, diagramId)`: retrieve the image URL, part rows and ordered condition rows.
 - `search_parts(vehicleId, query, diagramId?)`: search an 11-character BMW part number, including numbers containing letters, with optional spaces; retrieve matching diagrams and available supersession notes.
 
-Use the returned `vehicleId` on every catalog call. Results include `sourceUrl`, `retrievedAt` and `source`, which is `live` or `har`. There is no automatic fallback from live data to a capture.
+Use the returned `vehicleId` on every catalog call. Results include `sourceUrl`, `retrievedAt` and `source: "live"`.
 
 An example request to an agent:
 
 > Identify my BMW using VIN suffix VM52466. Find the drive shaft diagram, ask me about any unresolved transmission options, and give me the applicable part number with the source link.
 
-For the supplied capture, identification returns `UM92-EUR-01-2011-E88-BMW-118d`, January 2011, N47, right hand drive. Diagram `26_0216` contains manual shaft `26107567953` and automatic shaft `26117526136`, with `S205A=Yes` before the automatic row.
+For this example, identification returns `UM92-EUR-01-2011-E88-BMW-118d`, January 2011, N47, right hand drive. Diagram `26_0216` contains manual shaft `26107567953` and automatic shaft `26117526136`, with `S205A=Yes` before the automatic row.
 
 ## Fitment and repair scope
 
 `get_diagram_parts` returns `fitmentStatus: "requires_confirmation"`. Its `rows` preserve table order, `positionGroup`, indentation `depth`, and note cells. `parts` is a convenience list of the catalog part rows, including reference rows. Interpret it together with `rows`.
 
-Do not combine alternatives or repeated part numbers into a purchase list. Quantity `X` identifies a reference in the captured diagrams. Position `--` can mark a required companion or a compatibility reference. Read "only in conjunction with", "only applies to", option conditions, dates and `ENDED` notes before choosing parts. A diagram does not establish a complete repair procedure or every item needed for a job. Image URLs are returned as links; the server does not download images.
+Do not combine alternatives or repeated part numbers into a purchase list. Quantity `X` identifies a reference in catalog diagrams. Position `--` can mark a required companion or a compatibility reference. Read "only in conjunction with", "only applies to", option conditions, dates and `ENDED` notes before choosing parts. A diagram does not establish a complete repair procedure or every item needed for a job. Image URLs are returned as links; the server does not download images.
 
 ## Live access
 
@@ -71,34 +71,15 @@ google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/realoem-chrome
 
 Open RealOEM normally in that browser, then set `REALOEM_TRANSPORT=browser` and `REALOEM_CDP_URL` in the MCP configuration's `env` object. Browser session access is also subject to the site's availability and access controls. The server does not bypass challenges.
 
-## HAR replay and validation
-
-A locally supplied HAR supports an offline workflow for the vehicle and pages it captured. HAR files are excluded from the repository:
-
-```json
-{
-  "mcpServers": {
-    "realoem": {
-      "command": "node",
-      "args": ["/absolute/path/to/RealOEMMCP/dist/index.js"],
-      "env": {
-        "REALOEM_TRANSPORT": "har",
-        "REALOEM_HAR_PATH": "/absolute/path/to/www.realoem.com.har"
-      }
-    }
-  }
-}
-```
-
-HAR mode never requests uncaptured pages. A missing capture returns an error. The recorded part searches include `diagramId`, so provide it when replaying them. The original HAR is ignored by git; extracted HTML fixtures omit scripts and advertising blocks.
+## Development
 
 ```bash
+npm run build
 npm test
-REALOEM_HAR_PATH=www.realoem.com.har npx tsx scripts/smoke.ts
 ```
 
 Run `npm run format` to format TypeScript and JSON files, or `npm run format:check` to check their formatting.
 
-Tests cover VIN attributes, navigation, conditional alternatives, companion rows, reference quantities, replacement notes, challenge detection, caching and MCP tool calls. The smoke script starts the built server over stdio and exercises the recorded workflow.
+Sanitized HTML fixtures support offline tests for VIN attributes, navigation, conditional alternatives, companion rows, reference quantities, replacement notes, challenge detection, caching and MCP tool calls.
 
 Manual vehicle browsing follows the captured HTML form and JavaScript, but a live manual browsing sequence remains unverified. Cross-model applicability and VIN equipment decoding are not implemented.

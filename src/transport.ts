@@ -1,6 +1,5 @@
-import { readFile } from 'node:fs/promises';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
-import { BASE, assertPage } from './parser.js';
+import { assertPage } from './parser.js';
 
 export const DEFAULT_LIVE_BASE = 'https://new-ui.realoem.com/bmw/enUS/';
 export const DEFAULT_TRANSPORT = 'http';
@@ -9,56 +8,19 @@ export type PageResult = {
   html: string;
   sourceUrl: string;
   retrievedAt: string;
-  source: 'live' | 'har';
+  source: 'live';
 };
 export interface Transport {
   get(endpoint: string, params: Record<string, string | undefined>): Promise<PageResult>;
   close(): Promise<void>;
 }
 const endpoints = new Set(['select', 'partgrp', 'showparts', 'partsearch']);
-function urlFor(endpoint: string, params: Record<string, string | undefined>, base = BASE) {
+function urlFor(endpoint: string, params: Record<string, string | undefined>, base: string) {
   if (!endpoints.has(endpoint)) throw new Error('Unsupported RealOEM endpoint');
   const url = new URL(endpoint, base);
   for (const [key, value] of Object.entries(params))
     if (value !== undefined) url.searchParams.set(key, value);
   return url;
-}
-function key(url: URL) {
-  const pairs = [...url.searchParams]
-    .filter(([k]) => k !== 'ui' && (url.pathname.endsWith('/select') || k !== 'vin'))
-    .sort(([a], [b]) => a.localeCompare(b));
-  return url.pathname + '?' + new URLSearchParams(pairs).toString();
-}
-export async function harTransport(path: string): Promise<Transport> {
-  const har = JSON.parse(await readFile(path, 'utf8'));
-  const pages = new Map<string, { html: string; time: string }>();
-  for (const e of har.log.entries) {
-    const content = e.response.content;
-    if (e.response.status !== 200 || !content.text || !content.mimeType?.includes('text/html'))
-      continue;
-    const url = new URL(e.request.url);
-    if (url.origin !== new URL(BASE).origin) continue;
-    pages.set(key(url), {
-      html:
-        content.encoding === 'base64'
-          ? Buffer.from(content.text, 'base64').toString('utf8')
-          : content.text,
-      time: e.startedDateTime,
-    });
-  }
-  return {
-    async get(endpoint, params) {
-      const url = urlFor(endpoint, params),
-        page = pages.get(key(url));
-      if (!page)
-        throw new Error(
-          `No captured page for ${endpoint} with these parameters. HAR mode cannot query uncaptured vehicles or parts.`,
-        );
-      assertPage(page.html);
-      return { html: page.html, sourceUrl: url.href, retrievedAt: page.time, source: 'har' };
-    },
-    async close() {},
-  };
 }
 export class LiveTransport implements Transport {
   private base: string;

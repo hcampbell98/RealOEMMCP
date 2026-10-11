@@ -1,12 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../src/server.js';
-import { harTransport, LiveTransport } from '../src/transport.js';
+import { LiveTransport } from '../src/transport.js';
 test('MCP discovery, vehicle workflow, validation and tool errors', async () => {
   const server = createServer({
     async get(endpoint, params) {
@@ -17,7 +15,7 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
       );
       return {
         html,
-        source: 'har',
+        source: 'live',
         sourceUrl: 'https://www.realoem.com/bmw/enUS/' + endpoint,
         retrievedAt: '2026-10-11',
       };
@@ -51,7 +49,7 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
       arguments: { vehicleId: id, diagramId: '26_0216' },
     });
     assert.equal((parts.structuredContent as any).parts.length, 2);
-    assert.equal((parts.structuredContent as any).source, 'har');
+    assert.equal((parts.structuredContent as any).source, 'live');
     const invalid = await client.callTool({
       name: 'identify_vehicle',
       arguments: { vin: 'bad vin' },
@@ -65,33 +63,6 @@ test('MCP discovery, vehicle workflow, validation and tool errors', async () => 
   } finally {
     await client.close();
     await server.close();
-  }
-});
-test('HAR replay normalises parameter order and VIN on catalog pages, never guesses missing captures', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'realoem-test-'));
-  try {
-    const html = await readFile(new URL('./fixtures/partgrp-root.html', import.meta.url), 'utf8');
-    await writeFile(
-      join(dir, 'capture.har'),
-      JSON.stringify({
-        log: {
-          entries: [
-            {
-              request: {
-                url: 'https://www.realoem.com/bmw/enUS/partgrp?vin=VM52466&id=test-vehicle',
-              },
-              response: { status: 200, content: { text: html, mimeType: 'text/html' } },
-              startedDateTime: '2026-10-11',
-            },
-          ],
-        },
-      }),
-    );
-    const t = await harTransport(join(dir, 'capture.har'));
-    assert.equal((await t.get('partgrp', { id: 'test-vehicle' })).source, 'har');
-    await assert.rejects(t.get('partgrp', { id: 'different-vehicle' }), /No captured page/);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
   }
 });
 test('MCP accepts and normalises part numbers containing letters and preserves result anchors', async () => {
