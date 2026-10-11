@@ -38,7 +38,7 @@ function escapeHtml(value: string) {
   });
 }
 
-function page(body: string, headers = new Headers(), status = 200) {
+function page(body: string, headers = new Headers(), status = 200, callbackOrigin?: string) {
   headers.set('Content-Type', 'text/html; charset=utf-8');
   headers.set('Cache-Control', 'no-store');
   // no-referrer makes browser form POSTs send Origin: null. Preserve same-origin
@@ -48,7 +48,7 @@ function page(body: string, headers = new Headers(), status = 200) {
   headers.set('X-Frame-Options', 'DENY');
   headers.set(
     'Content-Security-Policy',
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${callbackOrigin ? ` ${callbackOrigin}` : ''}; frame-ancestors 'none'; base-uri 'none'`,
   );
   return new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -84,6 +84,10 @@ function consentPage(description: ConsentDescription, handle: string, headers: H
     <button type="submit" name="decision" value="allow">Allow access</button>
     <button type="submit" name="decision" value="deny">Deny</button></form>`,
     headers,
+    200,
+    // The provider validated this callback. Chrome checks it against form-action
+    // when following the POST redirect, even though the form submits to this Worker.
+    new URL(description.redirectUri).origin,
   );
 }
 

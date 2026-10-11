@@ -56,6 +56,11 @@ test('OAuth discovery, consent, PKCE, refresh, scope, audience, and revocation',
     // Chrome sends Origin: null for form POSTs under no-referrer, breaking our CSRF check.
     // Keep same-origin form submissions identifiable without leaking OAuth URLs to callbacks.
     assert.equal(consent.referrerPolicy, 'same-origin');
+    // Chrome applies form-action to the POST's redirect chain, including the client callback.
+    const formAction = consent
+      .contentSecurityPolicy!.split(';')
+      .find((directive) => directive.trim().startsWith('form-action'))!;
+    assert.equal(formAction.trim(), "form-action 'self' https://client.example");
     assert.ok(!consent.html.includes('<script>'));
     assert.match(consent.html, /&lt;script&gt;/);
     assert.match(consent.html, /client.example/);
