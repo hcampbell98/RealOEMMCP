@@ -41,7 +41,9 @@ function escapeHtml(value: string) {
 function page(body: string, headers = new Headers(), status = 200) {
   headers.set('Content-Type', 'text/html; charset=utf-8');
   headers.set('Cache-Control', 'no-store');
-  headers.set('Referrer-Policy', 'no-referrer');
+  // no-referrer makes browser form POSTs send Origin: null. Preserve same-origin
+  // identification for the CSRF check while suppressing referrers to OAuth callbacks.
+  headers.set('Referrer-Policy', 'same-origin');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Frame-Options', 'DENY');
   headers.set(

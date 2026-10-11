@@ -51,7 +51,7 @@ export class OAuthTestClient {
     const handle = html.match(/name="handle" value="([^"]+)"/)?.[1];
     assert.ok(handle);
     const cookie = response.headers.get('set-cookie')!.split(';')[0];
-    return { html, handle, cookie };
+    return { html, handle, cookie, referrerPolicy: response.headers.get('referrer-policy') };
   }
 
   submit(handle: string, cookie: string, token = this.loginToken, decision = 'allow') {

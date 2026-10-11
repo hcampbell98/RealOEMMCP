@@ -53,6 +53,9 @@ test('OAuth discovery, consent, PKCE, refresh, scope, audience, and revocation',
 
     await client.register('<script>alert("unsafe")</script>');
     const consent = await client.begin();
+    // Chrome sends Origin: null for form POSTs under no-referrer, breaking our CSRF check.
+    // Keep same-origin form submissions identifiable without leaking OAuth URLs to callbacks.
+    assert.equal(consent.referrerPolicy, 'same-origin');
     assert.ok(!consent.html.includes('<script>'));
     assert.match(consent.html, /&lt;script&gt;/);
     assert.match(consent.html, /client.example/);
