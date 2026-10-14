@@ -4,6 +4,8 @@ An MCP server for the [BMW parts catalog on RealOEM](https://new-ui.realoem.com/
 
 Run locally over stdio or deploy to Cloudflare Workers for remote access with OAuth.
 
+If you find this MCP useful, consider [donating to RealOEM](https://new-ui.realoem.com/bmw/donate).
+
 ## Deploy to Cloudflare
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hcampbell98/RealOEMMCP)
